@@ -34,12 +34,57 @@ jobs:
       - name: Build
         run: pnpm run build
 
-      - name: Deploy to Cloudflare Pages (Direct Upload)
+      - name: Deploy to Cloudflare Pages (API Direct Upload)
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          curl -fsSL https://github.com/cloudflare/wrangler2/releases/download/wrangler%40v3.90.0/wrangler-x86_64-unknown-linux-musl.tar.gz -o /tmp/wrangler.tar.gz
-          tar -xzf /tmp/wrangler.tar.gz -C /tmp
-          chmod +x /tmp/dist/wrangler
-          /tmp/dist/wrangler pages deploy dist --project-name=areej-workflow --commit-dirty=true
+          set -e
+          mkdir -p /tmp/upload && rm -f /tmp/upload/* manifest.json
+          HASHES=""
+          find dist -type f | while read -r f; do
+            REL="${f#dist/}"
+            B64=$(base64 -w0 "$f")
+            EXT="${REL##*.}"
+            case "$EXT" in
+              html) CT="text/html";;
+              css)  CT="text/css";;
+              js)   CT="application/javascript";;
+              png)  CT="image/png";;
+              jpg|jpeg) CT="image/jpeg";;
+              svg)  CT="image/svg+xml";;
+              json) CT="application/json";;
+              webmanifest) CT="application/manifest+json";;
+              *)    CT="application/octet-stream";;
+            esac
+            HASH=$(echo -n "$B64" | sha256sum | cut -d' ' -f1)
+            cp "$f" "/tmp/upload/$HASH"
+            python3 -c "
+          import json
+          p = 'manifest.json'
+          m = json.load(open(p)) if __import__('os').path.exists(p) else {}
+          m['/$REL'] = '$HASH'
+          json.dump(m, open(p, 'w'))
+          "
+          done
+          echo "manifest:" && cat manifest.json
+          echo "--- checking missing hashes ---"
+          CHECK=$(curl -s -X POST "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/pages/projects/areej-workflow/check-upload" \
+            -H "Authorization: Bearer $CF_TOKEN" -H "Content-Type: application/json" \
+            --data @manifest.json)
+          echo "$CHECK"
+          MISSING=$(echo "$CHECK" | python3 -c "import json,sys; print(' '.join(json.load(sys.stdin)['result']['missing_hashes']))")
+          for H in $MISSING; do
+            echo "uploading $H"
+            curl -s -X POST "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/pages/assets/upload" \
+              -H "Authorization: Bearer $CF_TOKEN" \
+              -F "file=@/tmp/upload/$H;filename=$H" | python3 -c "import json,sys; d=json.load(sys.stdin); print('upload ok:', d.get('success'))"
+          done
+          curl -s -X POST "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/pages/assets/upsert-hashes" \
+            -H "Authorization: Bearer $CF_TOKEN" -H "Content-Type: application/json" \
+            --data @manifest.json | python3 -c "import json,sys; print('upsert:', json.load(sys.stdin).get('success'))"
+          echo "--- creating deployment ---"
+          curl -s -X POST "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/pages/projects/areej-workflow/deployments" \
+            -H "Authorization: Bearer $CF_TOKEN" \
+            -F "manifest=@manifest.json;type=application/json" \
+            -F "branch=main" | python3 -c "import json,sys; d=json.load(sys.stdin); r=d.get('result') or {}; print('deploy success:', d.get('success'), '| url:', r.get('url')); sys.exit(0 if d.get('success') else 1)"
