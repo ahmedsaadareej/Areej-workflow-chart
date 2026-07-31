@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
-import { BookOpenText, Menu, X } from 'lucide-react';
+import { BookOpenText, LayoutGrid, Menu, X } from 'lucide-react';
 
 const links = [
   { href: '#map', label: 'الخريطة الرئيسية' },
@@ -48,6 +48,13 @@ export default function Navbar() {
             </a>
           ))}
           <Link
+            to="/charts"
+            className="mr-1 inline-flex items-center gap-1.5 rounded-lg border-2 border-brand-gold/60 px-3.5 py-1.5 text-sm font-black text-brand-gold transition-colors hover:bg-brand-gold/10"
+          >
+            <LayoutGrid className="w-4 h-4" />
+            المخططات
+          </Link>
+          <Link
             to="/details"
             className="mr-1 inline-flex items-center gap-1.5 rounded-lg bg-brand-gold px-3.5 py-2 text-sm font-black text-brand-green-dark transition-colors hover:bg-brand-gold/90"
           >
@@ -77,6 +84,14 @@ export default function Navbar() {
               {l.label}
             </a>
           ))}
+          <Link
+            to="/charts"
+            onClick={() => setOpen(false)}
+            className="inline-flex items-center gap-1.5 rounded-lg border-2 border-brand-gold/60 px-3 py-2.5 font-black text-brand-gold"
+          >
+            <LayoutGrid className="w-4 h-4" />
+            أطلس المخططات
+          </Link>
           <Link
             to="/details"
             onClick={() => setOpen(false)}

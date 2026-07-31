@@ -1,7 +1,8 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router'
-import { ArrowRight, BookOpenText, ChevronLeft, FileText, Home } from 'lucide-react'
+import { ArrowRight, BookOpenText, ChevronLeft, FileText, Home, LayoutGrid } from 'lucide-react'
 import { detailPagesList } from '../data/details'
+import { atlasFlows } from '../data/details/atlas'
 import { DetailIcon } from './DetailPage'
 
 export default function DetailsIndex() {
@@ -46,6 +47,26 @@ export default function DetailsIndex() {
 
       {/* بطاقات الأقسام */}
       <div className="mx-auto max-w-7xl px-4 py-12">
+        {/* لافتة أطلس المخططات */}
+        <Link
+          to="/charts"
+          className="group mb-8 flex flex-col items-start gap-4 rounded-2xl border-2 border-brand-gold/50 bg-gradient-to-l from-brand-green to-brand-green-dark p-6 text-white shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl sm:flex-row sm:items-center"
+        >
+          <div className="rounded-xl bg-brand-gold/20 p-3.5">
+            <LayoutGrid className="h-8 w-8 text-brand-gold" />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-xl font-black text-brand-gold">أطلس المخططات التشغيلية</h2>
+            <p className="mt-1 text-sm leading-relaxed text-white/85">
+              كل الرسوم التدفقية والمعادلات الحاكمة ({atlasFlows.length} مخططاً) في صفحة واحدة بفلاتر حسب القسم — مرجع سريع للعرض والمراجعة.
+            </p>
+          </div>
+          <span className="inline-flex items-center gap-1.5 rounded-xl bg-brand-gold px-5 py-2.5 font-black text-brand-green-dark transition-transform group-hover:-translate-x-1">
+            افتح الأطلس
+            <ChevronLeft className="h-4 w-4" />
+          </span>
+        </Link>
+
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {detailPagesList.map((page) => (
             <Link

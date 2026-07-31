@@ -288,11 +288,20 @@ export function BlockRenderer({ block }: { block: Block }) {
 }
 
 export function BlockList({ blocks }: { blocks: Block[] }) {
+  let flowOrdinal = 0
   return (
     <div className="space-y-6">
-      {blocks.map((block, i) => (
-        <BlockRenderer key={i} block={block} />
-      ))}
+      {blocks.map((block, i) => {
+        if (block.type === 'flow') {
+          const anchor = `flow-${flowOrdinal++}`
+          return (
+            <div key={i} id={anchor} className="scroll-mt-28">
+              <BlockRenderer block={block} />
+            </div>
+          )
+        }
+        return <BlockRenderer key={i} block={block} />
+      })}
     </div>
   )
 }

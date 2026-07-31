@@ -11,6 +11,7 @@ import {
   Handshake,
   Home,
   IdCard,
+  LayoutGrid,
   Map as MapIcon,
   Package,
   Palette,
@@ -104,9 +105,18 @@ export default function DetailPage() {
             <ChevronLeft className="h-4 w-4 text-muted-foreground/50" />
             <span className="font-black text-brand-green">{page.title}</span>
           </div>
-          <Link to="/">
-            <img src="/logo.png" alt="أريج" className="h-9 w-auto" />
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              to="/charts"
+              className="hidden items-center gap-1.5 rounded-lg border-2 border-brand-gold/50 px-3 py-1.5 text-xs font-black text-brand-gold transition-colors hover:bg-brand-gold/10 sm:inline-flex"
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              أطلس المخططات
+            </Link>
+            <Link to="/">
+              <img src="/logo.png" alt="أريج" className="h-9 w-auto" />
+            </Link>
+          </div>
         </div>
       </header>
 
