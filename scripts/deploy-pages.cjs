@@ -1,8 +1,15 @@
 /*
- * Deploy `dist/` to Cloudflare Pages via the official Direct Upload REST API.
- * Uses only Node built-ins (no npm packages) so it works in CI without wrangler.
- * Requires env: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID
- * Project name can be overridden via CF_PROJECT_NAME (default: areej-workflow).
+ * Deploy `dist/` to Cloudflare Pages via the Direct Upload flow used by Wrangler.
+ * Pure Node built-ins — no npm packages required.
+ *
+ * Flow:
+ *   1. GET  /accounts/:acct/pages/projects/:proj/upload-token  → short-lived JWT
+ *   2. POST /pages/assets/upload      (JWT auth) → upload file bodies (keyed by hash)
+ *   3. POST /pages/assets/upsert-hashes (JWT auth) → register uploaded hashes
+ *   4. POST /accounts/:acct/pages/projects/:proj/deployments (API-token auth, multipart) → create deployment
+ *
+ * Env required: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID
+ * Optional: CF_PROJECT_NAME (default: areej-workflow), CF_BRANCH (default: main)
  */
 const fs = require('fs')
 const path = require('path')
@@ -11,6 +18,7 @@ const crypto = require('crypto')
 const TOKEN = process.env.CLOUDFLARE_API_TOKEN
 const ACCOUNT = process.env.CLOUDFLARE_ACCOUNT_ID
 const PROJECT = process.env.CF_PROJECT_NAME || 'areej-workflow'
+const BRANCH = process.env.CF_BRANCH || 'main'
 const API = 'https://api.cloudflare.com/client/v4'
 
 if (!TOKEN || !ACCOUNT) {
@@ -19,6 +27,15 @@ if (!TOKEN || !ACCOUNT) {
 }
 
 const DIST = path.resolve(__dirname, '..', 'dist')
+
+const MIME = {
+  html: 'text/html', htm: 'text/html', css: 'text/css', js: 'application/javascript',
+  mjs: 'application/javascript', json: 'application/json', map: 'application/json',
+  png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif',
+  svg: 'image/svg+xml', webp: 'image/webp', ico: 'image/x-icon',
+  txt: 'text/plain', xml: 'application/xml', webmanifest: 'application/manifest+json',
+  woff: 'font/woff', woff2: 'font/woff2', ttf: 'font/ttf', mp4: 'video/mp4', pdf: 'application/pdf',
+}
 
 function collectFiles(dir, base) {
   let out = []
@@ -30,66 +47,65 @@ function collectFiles(dir, base) {
   return out
 }
 
-async function cf(pathname, options = {}) {
-  const res = await fetch(`${API}${pathname}`, {
-    ...options,
-    headers: { Authorization: `Bearer ${TOKEN}`, ...(options.headers || {}) },
-  })
+async function call(url, { token, method = 'GET', body, json = true } = {}) {
+  const headers = { Authorization: `Bearer ${token}` }
+  if (json && body) headers['Content-Type'] = 'application/json'
+  const res = await fetch(url, { method, headers, body })
   const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(`CF API ${res.status} on ${pathname}: ${JSON.stringify(data).slice(0, 300)}`)
+  if (!res.ok) throw new Error(`CF API ${res.status} ${url}: ${JSON.stringify(data).slice(0, 300)}`)
   return data
-}
-
-async function uploadOne(hash, buf) {
-  const form = new FormData()
-  form.append('file', new Blob([buf]), hash)
-  const data = await cf(`/accounts/${ACCOUNT}/pages/assets/upload`, { method: 'POST', body: form })
-  if (!data.success) throw new Error(`asset upload failed for ${hash}`)
 }
 
 async function main() {
   const files = collectFiles(DIST, DIST)
-  console.log(`Found ${files.length} files in dist/`)
   if (files.length === 0) throw new Error('dist/ is empty — run the build first')
+  console.log(`Found ${files.length} files in dist/`)
 
+  // 1) upload token
+  const { result } = await call(`${API}/accounts/${ACCOUNT}/pages/projects/${PROJECT}/upload-token`, { token: TOKEN })
+  const jwt = result.jwt
+  console.log('Got upload token')
+
+  // 2) build hashes (wrangler scheme: sha256 of base64(content) + extension) + upload
   const manifest = {}
-  const payloads = {}
+  const items = []
   for (const rel of files) {
     const buf = fs.readFileSync(path.join(DIST, rel))
-    const hash = crypto.createHash('sha256').update(buf.toString('base64')).digest('hex')
+    const b64 = buf.toString('base64')
+    const ext = path.extname(rel).slice(1).toLowerCase()
+    const hash = crypto.createHash('sha256').update(b64 + ext).digest('hex')
     manifest['/' + rel] = hash
-    payloads[hash] = buf
+    items.push({
+      key: hash,
+      value: b64,
+      metadata: { contentType: MIME[ext] || 'application/octet-stream' },
+      base64: true,
+    })
   }
 
-  const check = await cf(`/accounts/${ACCOUNT}/pages/projects/${PROJECT}/check-upload`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(manifest),
+  const up = await call(`${API}/pages/assets/upload`, {
+    token: jwt, method: 'POST', body: JSON.stringify(items),
   })
-  const missing = (check.result && check.result.missing_hashes) || []
-  console.log(`Missing assets to upload: ${missing.length}`)
+  const bad = up.result?.unsuccessful_keys || []
+  if (bad.length) throw new Error(`Upload failed for keys: ${bad.join(', ')}`)
+  console.log(`Uploaded ${up.result?.successful_key_count ?? items.length} assets`)
 
-  for (const hash of missing) {
-    await uploadOne(hash, payloads[hash])
-    console.log(`uploaded ${hash.slice(0, 12)}...`)
-  }
-
-  const upsert = await cf(`/accounts/${ACCOUNT}/pages/assets/upsert-hashes`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(manifest),
+  // 3) register hashes
+  await call(`${API}/pages/assets/upsert-hashes`, {
+    token: jwt, method: 'POST', body: JSON.stringify({ hashes: items.map((i) => i.key) }),
   })
-  if (!upsert.success) throw new Error('upsert-hashes failed')
+  console.log('Hashes registered')
 
+  // 4) create deployment (multipart/form-data with manifest)
   const form = new FormData()
   form.append('manifest', new Blob([JSON.stringify(manifest)], { type: 'application/json' }))
-  form.append('branch', 'main')
-  const deploy = await cf(`/accounts/${ACCOUNT}/pages/projects/${PROJECT}/deployments`, {
-    method: 'POST',
-    body: form,
+  form.append('branch', BRANCH)
+  const deploy = await call(`${API}/accounts/${ACCOUNT}/pages/projects/${PROJECT}/deployments`, {
+    token: TOKEN, method: 'POST', body: form, json: false,
   })
-  if (!deploy.success) throw new Error('deployment failed: ' + JSON.stringify(deploy.errors))
+  if (!deploy.success) throw new Error('Deployment failed: ' + JSON.stringify(deploy.errors))
   console.log('Deployment URL:', deploy.result.url)
+  console.log(`Live at https://${PROJECT}.pages.dev and attached custom domains`)
 }
 
 main().catch((err) => {
