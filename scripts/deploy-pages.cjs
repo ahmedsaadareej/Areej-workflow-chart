@@ -14,6 +14,7 @@
 const fs = require('fs')
 const path = require('path')
 const crypto = require('crypto')
+const { blake3 } = require('./blake3.cjs')
 
 const TOKEN = process.env.CLOUDFLARE_API_TOKEN
 const ACCOUNT = process.env.CLOUDFLARE_ACCOUNT_ID
@@ -66,14 +67,14 @@ async function main() {
   const jwt = result.jwt
   console.log('Got upload token')
 
-  // 2) build hashes (wrangler scheme: sha256 of base64(content) + extension) + upload
+  // 2) build hashes (wrangler scheme: blake3 of base64(content) + extension, first 32 hex chars) + upload
   const manifest = {}
   const items = []
   for (const rel of files) {
     const buf = fs.readFileSync(path.join(DIST, rel))
     const b64 = buf.toString('base64')
     const ext = path.extname(rel).slice(1).toLowerCase()
-    const hash = crypto.createHash('sha256').update(b64).digest('hex')
+    const hash = blake3(b64 + ext).slice(0, 32)
     manifest['/' + rel] = hash
     items.push({
       key: hash,
