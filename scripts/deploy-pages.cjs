@@ -47,8 +47,8 @@ function collectFiles(dir, base) {
   return out
 }
 
-async function call(url, { token, method = 'GET', body, json = true } = {}) {
-  const headers = { Authorization: `Bearer ${token}` }
+async function call(url, { token, method = 'GET', body, json = true, extraHeaders = {} } = {}) {
+  const headers = { Authorization: `Bearer ${token}`, ...extraHeaders }
   if (json && body) headers['Content-Type'] = 'application/json'
   const res = await fetch(url, { method, headers, body })
   const data = await res.json().catch(() => ({}))
@@ -96,12 +96,24 @@ async function main() {
   })
   console.log('Hashes registered')
 
-  // 4) create deployment (multipart/form-data with manifest)
-  const form = new FormData()
-  form.append('manifest', new Blob([JSON.stringify(manifest)], { type: 'application/json' }))
-  form.append('branch', BRANCH)
+  // 4) create deployment (multipart/form-data; manifest as an inline field with JSON content-type)
+  const boundary = '----cfdeploy' + crypto.randomBytes(12).toString('hex')
+  const manifestJson = JSON.stringify(manifest)
+  const body = Buffer.concat([
+    Buffer.from(
+      `--${boundary}\r\n` +
+        `Content-Disposition: form-data; name="manifest"\r\n` +
+        `Content-Type: application/json\r\n\r\n` +
+        `${manifestJson}\r\n` +
+        `--${boundary}\r\n` +
+        `Content-Disposition: form-data; name="branch"\r\n\r\n` +
+        `${BRANCH}\r\n` +
+        `--${boundary}--\r\n`
+    ),
+  ])
   const deploy = await call(`${API}/accounts/${ACCOUNT}/pages/projects/${PROJECT}/deployments`, {
-    token: TOKEN, method: 'POST', body: form, json: false,
+    token: TOKEN, method: 'POST', body, json: false,
+    extraHeaders: { 'Content-Type': `multipart/form-data; boundary=${boundary}` },
   })
   if (!deploy.success) throw new Error('Deployment failed: ' + JSON.stringify(deploy.errors))
   console.log('Deployment URL:', deploy.result.url)
