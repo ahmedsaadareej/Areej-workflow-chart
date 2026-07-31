@@ -1,3 +1,4 @@
+import { Link } from 'react-router';
 import { meta } from '@/data/workflow';
 import { decisions } from '@/data/decisions';
 import { testPackages, futureTopics } from '@/data/extras';
@@ -65,6 +66,12 @@ export default function Hero() {
               >
                 الخريطة الرئيسية للدورة
               </a>
+              <Link
+                to="/details"
+                className="border-2 border-brand-gold/60 bg-brand-gold/10 hover:bg-brand-gold text-brand-gold hover:text-emerald-950 font-bold px-6 py-3 rounded-xl transition-colors"
+              >
+                الدليل التفصيلي لتنفيذ ERP
+              </Link>
             </div>
           </div>
         </div>

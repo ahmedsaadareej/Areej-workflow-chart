@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { glossary } from '@/data/workflow';
 import { roles } from '@/data/extras';
 import { BookOpenText, UsersRound, Search } from 'lucide-react';
+import MoreButton from '@/components/more-button';
 
 export function Roles() {
   return (
@@ -29,6 +30,8 @@ export function Roles() {
             </div>
           ))}
         </div>
+
+        <MoreButton to="/details/roles" label="اعرف المزيد عن فصل المهام والصلاحيات" dark />
       </div>
     </section>
   );
@@ -72,6 +75,8 @@ export function Glossary() {
           <div className="col-span-full text-center py-10 text-muted-foreground font-bold">لا توجد نتائج مطابقة.</div>
         )}
       </div>
+
+      <MoreButton to="/details/rules" label="اعرف المزيد عن مرجعية الأنظمة وحالات البنود" />
     </section>
   );
 }

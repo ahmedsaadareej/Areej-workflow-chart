@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router';
 import { categories } from '@/data/workflow';
 import { decisions } from '@/data/decisions';
-import { Search, ChevronDown, Scale, Route, ShieldCheck, Tag, BadgeCheck } from 'lucide-react';
+import { Search, ChevronDown, ChevronLeft, Scale, Route, ShieldCheck, Tag, BadgeCheck, BookOpenText } from 'lucide-react';
 
 export default function DecisionsExplorer() {
   const [query, setQuery] = useState('');
@@ -32,6 +33,16 @@ export default function DecisionsExplorer() {
           <p className="text-muted-foreground mt-3 max-w-2xl mx-auto">
             كل بند يحمل رقم قرار فهو قرار تشغيل معتمد؛ قاعدة الاعتماد: أي تعديل يصدر تعديلاً صريحاً على القرار نفسه ولا يحذف الأثر السابق.
           </p>
+          <div className="mt-5">
+            <Link
+              to="/details"
+              className="inline-flex items-center gap-2 bg-brand-green hover:bg-brand-green-dark text-white font-extrabold px-6 py-2.5 rounded-xl transition-colors"
+            >
+              <BookOpenText className="w-4 h-4" />
+              الدليل التفصيلي الكامل لكل الأقسام
+              <ChevronLeft className="w-4 h-4" />
+            </Link>
+          </div>
         </div>
 
         {/* البحث والتصفية */}
@@ -141,6 +152,14 @@ export default function DecisionsExplorer() {
                         </span>
                       ))}
                     </div>
+                    <Link
+                      to={`/details/${d.categoryId}#${'d-' + d.id.replace(/\s+/g, '').toLowerCase()}`}
+                      className="inline-flex w-fit items-center gap-1.5 text-sm font-extrabold text-brand-gold hover:text-brand-green transition-colors"
+                    >
+                      <BookOpenText className="w-4 h-4" />
+                      اعرف المزيد — الشرح الكامل والمخطط في الدليل التفصيلي
+                      <ChevronLeft className="w-4 h-4" />
+                    </Link>
                   </div>
                 )}
               </article>

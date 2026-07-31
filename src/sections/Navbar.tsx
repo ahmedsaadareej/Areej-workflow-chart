@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Menu, X } from 'lucide-react';
+import { Link } from 'react-router';
+import { BookOpenText, Menu, X } from 'lucide-react';
 
 const links = [
   { href: '#map', label: 'الخريطة الرئيسية' },
@@ -46,6 +47,13 @@ export default function Navbar() {
               {l.label}
             </a>
           ))}
+          <Link
+            to="/details"
+            className="mr-1 inline-flex items-center gap-1.5 rounded-lg bg-brand-gold px-3.5 py-2 text-sm font-black text-brand-green-dark transition-colors hover:bg-brand-gold/90"
+          >
+            <BookOpenText className="w-4 h-4" />
+            الدليل التفصيلي
+          </Link>
         </nav>
 
         <button
@@ -69,6 +77,14 @@ export default function Navbar() {
               {l.label}
             </a>
           ))}
+          <Link
+            to="/details"
+            onClick={() => setOpen(false)}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-brand-gold px-3 py-2.5 font-black text-brand-green-dark"
+          >
+            <BookOpenText className="w-4 h-4" />
+            الدليل التفصيلي
+          </Link>
         </nav>
       )}
     </header>

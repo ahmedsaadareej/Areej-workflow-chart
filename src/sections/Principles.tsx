@@ -1,5 +1,6 @@
 import { principles } from '@/data/workflow';
 import { Compass } from 'lucide-react';
+import MoreButton from '@/components/more-button';
 
 export default function Principles() {
   return (
@@ -29,6 +30,8 @@ export default function Principles() {
           </div>
         ))}
       </div>
+
+      <MoreButton to="/details/rules" label="اعرف المزيد عن قواعد القراءة والتنفيذ" />
     </section>
   );
 }

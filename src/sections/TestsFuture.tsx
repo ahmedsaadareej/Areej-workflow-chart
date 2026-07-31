@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { testPackages, futureTopics } from '@/data/extras';
 import { FlaskConical, Rocket, Lock } from 'lucide-react';
+import MoreButton from '@/components/more-button';
 
 export function TestPackages() {
   return (
@@ -33,6 +34,8 @@ export function TestPackages() {
             </div>
           ))}
         </div>
+
+        <MoreButton to="/details/uat" label="اعرف المزيد عن اختبارات القبول" />
       </div>
     </section>
   );
@@ -87,6 +90,8 @@ export function FutureTopics() {
           بينما تبقى التحسينات المتقدمة في مرحلتها اللاحقة بسجل واضح — وأي قرار جديد يُسجَّل في سجل القرارات ويُحدَّث هذا المستند عند الحاجة دون إعادة تسمية النسخ التاريخية.
         </p>
       </div>
+
+      <MoreButton to="/details/backlog" label="اعرف المزيد عن خطة التنفيذ والـ Backlog" />
     </section>
   );
 }

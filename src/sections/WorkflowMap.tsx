@@ -1,5 +1,6 @@
 import { workflowSteps, designRule } from '@/data/workflow';
 import { ArrowLeft, Info } from 'lucide-react';
+import MoreButton from '@/components/more-button';
 
 export default function WorkflowMap() {
   return (
@@ -46,6 +47,8 @@ export default function WorkflowMap() {
           </p>
         </div>
       </div>
+
+      <MoreButton to="/details/business-map" label="اعرف المزيد عن الخريطة وأبعاد التحليل" />
     </section>
   );
 }
