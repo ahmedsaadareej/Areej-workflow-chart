@@ -26,7 +26,7 @@ export default function ChartsAtlas() {
   return (
     <div className="min-h-screen bg-background font-cairo text-foreground">
       {/* شريط علوي */}
-      <header className="sticky top-0 z-40 border-b border-border bg-card/95 backdrop-blur">
+      <header className="sticky top-0 z-40 border-b border-border bg-card backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3">
           <div className="flex items-center gap-2 text-sm">
             <Link to="/" className="inline-flex items-center gap-1.5 font-bold text-muted-foreground transition-colors hover:text-brand-green">
@@ -62,7 +62,7 @@ export default function ChartsAtlas() {
       </div>
 
       {/* شريط الفلاتر */}
-      <div className="sticky top-[57px] z-30 border-b border-border bg-background/95 backdrop-blur">
+      <div className="sticky top-[57px] z-30 border-b border-border bg-background backdrop-blur">
         <div className="mx-auto max-w-7xl px-4 py-3">
           <div className="scrollbar-thin -mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
             <button

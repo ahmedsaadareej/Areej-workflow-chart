@@ -16,9 +16,20 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
 
+  // التحول للخلفية الغامقة قبل أن تلامس الموجة البيضاء أسفل الـ Hero الهيدر —
+  // يضمن وضوح النص الأبيض في كل لحظة أثناء السكرول
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 24);
-    window.addEventListener('scroll', onScroll);
+    const hero = document.getElementById('top');
+    const onScroll = () => {
+      if (hero) {
+        // 160px = ارتفاع الهيدر (~72) + ارتفاع الموجة البيضاء أسفل الـ Hero (80) + هامش أمان
+        setScrolled(hero.getBoundingClientRect().bottom <= 160);
+      } else {
+        setScrolled(window.scrollY > 24);
+      }
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
@@ -73,7 +84,7 @@ export default function Navbar() {
       </div>
 
       {open && (
-        <nav className="lg:hidden bg-brand-green-dark/98 backdrop-blur border-t border-white/10 px-4 py-3 flex flex-col gap-1">
+        <nav className="lg:hidden bg-brand-green-dark/95 backdrop-blur border-t border-white/10 px-4 py-3 flex flex-col gap-1">
           {links.map((l) => (
             <a
               key={l.href}
