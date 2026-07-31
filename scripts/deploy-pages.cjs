@@ -73,7 +73,7 @@ async function main() {
     const buf = fs.readFileSync(path.join(DIST, rel))
     const b64 = buf.toString('base64')
     const ext = path.extname(rel).slice(1).toLowerCase()
-    const hash = crypto.createHash('sha256').update(b64 + ext).digest('hex')
+    const hash = crypto.createHash('sha256').update(b64).digest('hex')
     manifest['/' + rel] = hash
     items.push({
       key: hash,
