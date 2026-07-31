@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router'
 import {
   ArrowRight,
@@ -22,7 +22,7 @@ import {
   Warehouse,
 } from 'lucide-react'
 import { detailPagesBySlug, detailPagesList } from '../data/details'
-import type { DetailPageData } from '../data/details/types'
+import type { Block, DetailPageData } from '../data/details/types'
 import { BlockList } from '../components/detail-blocks'
 
 const iconMap: Record<string, typeof MapIcon> = {
@@ -47,32 +47,90 @@ export function DetailIcon({ name, className }: { name: string; className?: stri
   return <Icon className={className} />
 }
 
+type HeadingBlock = Extract<Block, { type: 'heading' }>
+
+interface PageSection {
+  heading: HeadingBlock
+  blocks: Block[]
+}
+
+const countFlows = (blocks: Block[]) => blocks.filter((b) => b.type === 'flow').length
+
 export default function DetailPage() {
   const { slug } = useParams()
   const location = useLocation()
   const page: DetailPageData | undefined = slug ? detailPagesBySlug[slug] : undefined
 
+  const [activeTab, setActiveTab] = useState(0)
+  const contentTopRef = useRef<HTMLDivElement>(null)
+  const pendingScroll = useRef<string | null>(null)
+
   const pageIndex = page ? detailPagesList.findIndex((p) => p.slug === page.slug) : -1
   const prevPage = pageIndex > 0 ? detailPagesList[pageIndex - 1] : undefined
   const nextPage = pageIndex >= 0 && pageIndex < detailPagesList.length - 1 ? detailPagesList[pageIndex + 1] : undefined
 
+  // تقسيم الكتل إلى مقدمة + أقسام (كل عنوان رئيسي = تبويب) دون تغيير المحتوى
+  const parsed = useMemo(() => {
+    if (!page) return null
+    const preamble: Block[] = []
+    const sections: PageSection[] = []
+    for (const b of page.blocks) {
+      if (b.type === 'heading') sections.push({ heading: b, blocks: [] })
+      else if (sections.length) sections[sections.length - 1].blocks.push(b)
+      else preamble.push(b)
+    }
+    // إزاحة ترقيم المخططات لكل قسم (تحافظ على مراسي flow-N العالمية)
+    const offsets: number[] = []
+    let acc = countFlows(preamble)
+    for (const s of sections) {
+      offsets.push(acc)
+      acc += countFlows(s.blocks)
+    }
+    // خريطة المراسي → رقم التبويب (للروابط العميقة من الموقع والأطلس)
+    const hashMap: Record<string, number> = {}
+    sections.forEach((s, i) => {
+      if (s.heading.anchor) hashMap[s.heading.anchor] = i
+      let f = offsets[i]
+      for (const b of s.blocks) {
+        if (b.type === 'decision') hashMap['d-' + b.id.replace(/\s+/g, '').toLowerCase()] = i
+        if (b.type === 'flow') hashMap['flow-' + f++] = i
+      }
+    })
+    return { preamble, sections, offsets, hashMap }
+  }, [page])
+
+  // الروابط العميقة: #d-d33 أو #flow-2 أو #anchor يفتح التبويب الصح ثم يمرّر للعنصر
   useEffect(() => {
-    if (!page) return
-    if (location.hash) {
-      const id = location.hash.replace('#', '')
+    if (!parsed) return
+    const hash = location.hash.replace('#', '')
+    if (!hash) {
+      setActiveTab(0)
+      window.scrollTo({ top: 0 })
+      return
+    }
+    const idx = parsed.hashMap[hash]
+    if (idx !== undefined) {
+      pendingScroll.current = hash
+      setActiveTab(idx)
+    }
+  }, [location.hash, parsed])
+
+  useEffect(() => {
+    if (pendingScroll.current) {
+      const id = pendingScroll.current
+      pendingScroll.current = null
       const timer = setTimeout(() => {
         document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }, 120)
+      }, 140)
       return () => clearTimeout(timer)
     }
-    window.scrollTo({ top: 0 })
-  }, [page, location.hash])
+  }, [activeTab])
 
   useEffect(() => {
     if (page) document.title = `${page.title} — الدليل التفصيلي | أريج`
   }, [page])
 
-  if (!page) {
+  if (!page || !parsed) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4 text-center font-cairo">
         <p className="text-6xl font-black text-brand-green">404</p>
@@ -87,6 +145,18 @@ export default function DetailPage() {
       </div>
     )
   }
+
+  const tocLabel = (anchor: string | undefined, fallback: string) =>
+    (anchor && page.toc.find((t) => t.id === anchor)?.label) || fallback
+
+  const selectTab = (i: number) => {
+    setActiveTab(i)
+    const anchor = parsed.sections[i].heading.anchor
+    if (anchor) window.history.replaceState(null, '', `#${anchor}`)
+    setTimeout(() => contentTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60)
+  }
+
+  const active = parsed.sections[activeTab]
 
   return (
     <div className="min-h-screen bg-background font-cairo text-foreground">
@@ -148,61 +218,75 @@ export default function DetailPage() {
         </div>
       </div>
 
-      {/* المحتوى */}
-      <div className="mx-auto max-w-7xl gap-10 px-4 py-10 lg:flex">
-        {/* الفهرس الجانبي */}
-        <aside className="mb-8 shrink-0 lg:mb-0 lg:w-64">
-          <div className="rounded-2xl border border-border bg-card p-4 lg:sticky lg:top-24">
-            <p className="mb-3 text-sm font-black text-brand-green">محتويات الصفحة</p>
-            <ul className="space-y-1">
-              {page.toc.map((item) => (
-                <li key={item.id}>
-                  <a
-                    href={`#${item.id}`}
-                    className="block rounded-lg px-3 py-2 text-sm font-bold text-muted-foreground transition-colors hover:bg-brand-green/5 hover:text-brand-green"
-                  >
-                    {item.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
+      {/* شريط التبويبات */}
+      <div className="sticky top-[61px] z-30 border-b border-border bg-background/95 backdrop-blur">
+        <div className="mx-auto max-w-5xl px-4 py-3">
+          <div className="scrollbar-thin -mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+            {parsed.sections.map((s, i) => {
+              const decision = s.blocks.find((b) => b.type === 'decision') as Extract<Block, { type: 'decision' }> | undefined
+              const isActive = i === activeTab
+              return (
+                <button
+                  key={i}
+                  onClick={() => selectTab(i)}
+                  className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border-2 px-4 py-2 text-sm font-bold transition-colors ${
+                    isActive ? 'border-brand-green bg-brand-green text-white' : 'border-border bg-card hover:border-brand-gold'
+                  }`}
+                >
+                  {decision && (
+                    <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-black ${isActive ? 'bg-white/20 text-white' : 'bg-brand-green/10 text-brand-green'}`} dir="ltr">
+                      {decision.id}
+                    </span>
+                  )}
+                  {tocLabel(s.heading.anchor, s.heading.text)}
+                </button>
+              )
+            })}
           </div>
-        </aside>
+        </div>
+      </div>
 
-        {/* الكتل */}
-        <main className="min-w-0 flex-1">
-          <BlockList blocks={page.blocks} />
+      {/* المحتوى */}
+      <div className="mx-auto max-w-5xl px-4 py-8">
+        {/* مقدمة الصفحة (ثابتة فوق كل التبويبات) */}
+        {parsed.preamble.length > 0 && (
+          <div className="mb-8">
+            <BlockList blocks={parsed.preamble} />
+          </div>
+        )}
 
-          {/* تنقل سابق / تالي */}
-          <nav className="mt-12 grid gap-3 border-t border-border pt-8 sm:grid-cols-2">
-            {prevPage ? (
-              <Link
-                to={`/details/${prevPage.slug}`}
-                className="group flex items-center gap-3 rounded-2xl border border-border bg-card p-4 transition-all hover:border-brand-gold hover:shadow-md"
-              >
-                <ArrowRight className="h-5 w-5 shrink-0 text-brand-gold" />
-                <div>
-                  <p className="text-xs text-muted-foreground">السابق</p>
-                  <p className="font-black text-brand-green group-hover:text-brand-gold">{prevPage.title}</p>
-                </div>
-              </Link>
-            ) : (
-              <span />
-            )}
-            {nextPage && (
-              <Link
-                to={`/details/${nextPage.slug}`}
-                className="group flex items-center justify-end gap-3 rounded-2xl border border-border bg-card p-4 text-left transition-all hover:border-brand-gold hover:shadow-md sm:text-right"
-              >
-                <div>
-                  <p className="text-xs text-muted-foreground">التالي</p>
-                  <p className="font-black text-brand-green group-hover:text-brand-gold">{nextPage.title}</p>
-                </div>
-                <ChevronLeft className="h-5 w-5 shrink-0 text-brand-gold" />
-              </Link>
-            )}
-          </nav>
-        </main>
+        <div ref={contentTopRef} className="scroll-mt-32" />
+        {active && <BlockList blocks={[active.heading, ...active.blocks]} flowStart={parsed.offsets[activeTab]} />}
+
+        {/* تنقل سابق / تالي */}
+        <nav className="mt-12 grid gap-3 border-t border-border pt-8 sm:grid-cols-2">
+          {prevPage ? (
+            <Link
+              to={`/details/${prevPage.slug}`}
+              className="group flex items-center gap-3 rounded-2xl border border-border bg-card p-4 transition-all hover:border-brand-gold hover:shadow-md"
+            >
+              <ArrowRight className="h-5 w-5 shrink-0 text-brand-gold" />
+              <div>
+                <p className="text-xs text-muted-foreground">السابق</p>
+                <p className="font-black text-brand-green group-hover:text-brand-gold">{prevPage.title}</p>
+              </div>
+            </Link>
+          ) : (
+            <span />
+          )}
+          {nextPage && (
+            <Link
+              to={`/details/${nextPage.slug}`}
+              className="group flex items-center justify-end gap-3 rounded-2xl border border-border bg-card p-4 text-left transition-all hover:border-brand-gold hover:shadow-md sm:text-right"
+            >
+              <div>
+                <p className="text-xs text-muted-foreground">التالي</p>
+                <p className="font-black text-brand-green group-hover:text-brand-gold">{nextPage.title}</p>
+              </div>
+              <ChevronLeft className="h-5 w-5 shrink-0 text-brand-gold" />
+            </Link>
+          )}
+        </nav>
       </div>
 
       {/* تذييل بسيط */}

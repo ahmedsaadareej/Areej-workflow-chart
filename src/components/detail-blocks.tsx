@@ -287,8 +287,8 @@ export function BlockRenderer({ block }: { block: Block }) {
   }
 }
 
-export function BlockList({ blocks }: { blocks: Block[] }) {
-  let flowOrdinal = 0
+export function BlockList({ blocks, flowStart = 0 }: { blocks: Block[]; flowStart?: number }) {
+  let flowOrdinal = flowStart
   return (
     <div className="space-y-6">
       {blocks.map((block, i) => {
